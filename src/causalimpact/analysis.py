@@ -354,8 +354,10 @@ class CausalImpact:
             "niter": 1000,
             "standardize_data": True,
             "prior_level_sd": 0.01,
-            "nseasons": 1,
-            "season_duration": 1,
+            "level": False,
+            "trend": False,
+            "seasonal": None,
+            "freq_seasonal": None,
             "dynamic_regression": False,
         }
 
@@ -431,7 +433,7 @@ class CausalImpact:
         model = construct_model(df_pre, model_args)
         self.model = model
 
-        model_results = model_fit(model, estimation, model_args)
+        model_results, plot_index = model_fit(model, estimation, model_args)
 
         inferences = compile_inferences(
             model_results,
@@ -447,6 +449,7 @@ class CausalImpact:
         # "append" to 'CausalImpact' object
         self.inferences = inferences["series"]
         self.results = model_results
+        self.plot_index = plot_index
 
     def _run_with_ucm(
         self, ucm_model, post_period_response, alpha, model_args, estimation
@@ -471,7 +474,7 @@ class CausalImpact:
 
         orig_std_params = (0, 1)
 
-        model_results = model_fit(ucm_model, estimation, model_args)
+        model_results, plot_index = model_fit(ucm_model, estimation, model_args)
 
         # Compile posterior inferences
         inferences = compile_inferences(
@@ -492,6 +495,7 @@ class CausalImpact:
         self.data = pd.concat([df_pre, post_period_response])
         self.inferences = inferences["series"]
         self.results = model_results
+        self.plot_index = plot_index
 
     @staticmethod
     def _print_report(
@@ -862,7 +866,7 @@ class CausalImpact:
         self,
         panels=None,
         figsize=(15, 12),
-        fname=None,
+        fname=None
     ):
         if panels is None:
             panels = ["original", "pointwise", "cumulative"]
@@ -873,7 +877,7 @@ class CausalImpact:
         if isinstance(data_inter, pd.DatetimeIndex):
             data_inter = pd.Timestamp(data_inter)
 
-        inferences = self.inferences.iloc[1:, :]
+        inferences = self.inferences.iloc[self.plot_index:, :]
 
         # Observation and regression components
         if "original" in panels:
@@ -950,6 +954,11 @@ class CausalImpact:
 
             plt.title("Cumulative Impact")
         plt.xlabel("$T$")
+        
+        text = ('Note: The first %d observations are not shown, due to'
+                    ' approximate diffuse initialization.')
+        fig.text(0.1, 0.01, text % self.plot_index, fontsize='large')
+        
         if fname is None:
             plt.show()
         else:
